@@ -8,13 +8,15 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 // - static (npm run build:static): todo inlineado en un único index.html autocontenido
 //   (viteSingleFile) con HashRouter, para abrir el archivo a mano con doble clic sin servidor.
 // - pages (npm run build): build normal de varios ficheros para publicar en GitHub Pages,
-//   bajo /ofipapel-erp/. También usa HashRouter para no depender de que el servidor resuelva
-//   rutas profundas (GitHub Pages no tiene reescritura de rutas tipo SPA).
+//   bajo /ofipapel-ERP/ (el repo quedó con esa mayúscula — GitHub Pages distingue
+//   mayúsculas/minúsculas en las rutas, así que tiene que ser exacto). También usa HashRouter
+//   para no depender de que el servidor resuelva rutas profundas (GitHub Pages no tiene
+//   reescritura de rutas tipo SPA).
 export default defineConfig(({ mode }) => {
   const isStatic = mode === 'static'
   const isPages = mode === 'pages'
   return {
-    base: isStatic ? './' : isPages ? '/ofipapel-erp/' : '/',
+    base: isStatic ? './' : isPages ? '/ofipapel-ERP/' : '/',
     plugins: [react(), tailwindcss(), ...(isStatic ? [viteSingleFile()] : [])],
     define: {
       __USE_HASH_ROUTER__: isStatic || isPages,
