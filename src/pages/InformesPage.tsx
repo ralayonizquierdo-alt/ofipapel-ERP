@@ -1,0 +1,242 @@
+import { useMemo } from 'react'
+import { BarChart3 } from 'lucide-react'
+import { useDatabase } from '../lib/DatabaseContext'
+import Badge from '../components/Badge'
+import ReportBuilder, { type DimensionOption } from '../components/ReportBuilder'
+import { formatEUR } from '../lib/format'
+
+function daysSince(iso: string): number {
+  return Math.round((Date.now() - new Date(iso).getTime()) / 86400000)
+}
+
+function BarRow({ label, value, max, formatted }: { label: string; value: number; max: number; formatted: string }) {
+  const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0
+  return (
+    <div className="py-2">
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span className="text-slate-700 truncate pr-2">{label}</span>
+        <span className="text-slate-500 shrink-0">{formatted}</span>
+      </div>
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-slate-700 rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+export default function InformesPage() {
+  const { db } = useDatabase()
+
+  const productById = useMemo(() => new Map(db.products.map((p) => [p.id, p])), [db.products])
+  const clienteById = useMemo(() => new Map(db.clients.map((c) => [c.id, c])), [db.clients])
+  const repById = useMemo(() => new Map(db.salesReps.map((r) => [r.id, r])), [db.salesReps])
+  const subfamiliaById = useMemo(() => new Map(db.subfamilias.map((s) => [s.id, s])), [db.subfamilias])
+
+  function familiaIdParaProducto(productoId: string): string {
+    const subfamiliaId = productById.get(productoId)?.subfamiliaId
+    return (subfamiliaId && subfamiliaById.get(subfamiliaId)?.familiaId) ?? ''
+  }
+
+  const rankingProductos = useMemo(() => {
+    const map = new Map<string, { unidades: number; importe: number; margen: number }>()
+    db.sales.forEach((s) => {
+      s.lineas.forEach((l) => {
+        const acc = map.get(l.productoId) ?? { unidades: 0, importe: 0, margen: 0 }
+        const producto = productById.get(l.productoId)
+        acc.unidades += l.cantidad
+        acc.importe += l.cantidad * l.precioUnit
+        if (producto) acc.margen += l.cantidad * (l.precioUnit - producto.coste)
+        map.set(l.productoId, acc)
+      })
+    })
+    return [...map.entries()]
+      .map(([productoId, v]) => ({ nombre: productById.get(productoId)?.nombre ?? 'Producto eliminado', ...v }))
+      .sort((a, b) => b.importe - a.importe)
+      .slice(0, 8)
+  }, [db.sales, productById])
+
+  const rankingClientes = useMemo(() => {
+    const map = new Map<string, number>()
+    db.sales.forEach((s) => map.set(s.clienteId, (map.get(s.clienteId) ?? 0) + s.total))
+    return [...map.entries()]
+      .map(([clienteId, total]) => ({ nombre: clienteById.get(clienteId)?.nombre ?? 'Cliente eliminado', total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+  }, [db.sales, clienteById])
+
+  const rankingComerciales = useMemo(() => {
+    const map = new Map<string, { total: number; pedidos: number }>()
+    db.sales.forEach((s) => {
+      const acc = map.get(s.comercialId) ?? { total: 0, pedidos: 0 }
+      acc.total += s.total
+      acc.pedidos += 1
+      map.set(s.comercialId, acc)
+    })
+    return [...map.entries()]
+      .map(([comercialId, v]) => ({ nombre: repById.get(comercialId)?.nombre ?? '—', ...v }))
+      .sort((a, b) => b.total - a.total)
+  }, [db.sales, repById])
+
+  const rotacionPorCategoria = useMemo(() => {
+    const vendidos = new Map<string, number>()
+    db.sales
+      .filter((s) => daysSince(s.fecha) <= 30)
+      .forEach((s) =>
+        s.lineas.forEach((l) => {
+          const cat = familiaIdParaProducto(l.productoId)
+          if (!cat) return
+          vendidos.set(cat, (vendidos.get(cat) ?? 0) + l.cantidad)
+        }),
+      )
+    const stockPorCategoria = new Map<string, number>()
+    db.stock.forEach((s) => {
+      const cat = familiaIdParaProducto(s.productoId)
+      if (!cat) return
+      stockPorCategoria.set(cat, (stockPorCategoria.get(cat) ?? 0) + s.unidades)
+    })
+    return db.categories
+      .map((c) => {
+        const stock = stockPorCategoria.get(c.id) ?? 0
+        const vendido = vendidos.get(c.id) ?? 0
+        return { nombre: c.nombre, stock, vendido, rotacion: stock > 0 ? vendido / stock : 0 }
+      })
+      .sort((a, b) => b.rotacion - a.rotacion)
+  }, [db.sales, db.stock, db.categories, productById, subfamiliaById])
+
+  const maxProducto = Math.max(...rankingProductos.map((p) => p.importe), 1)
+  const maxCliente = Math.max(...rankingClientes.map((c) => c.total), 1)
+  const maxComercial = Math.max(...rankingComerciales.map((c) => c.total), 1)
+  const maxRotacion = Math.max(...rotacionPorCategoria.map((c) => c.rotacion), 0.01)
+
+  const categoriaById = useMemo(() => new Map(db.categories.map((c) => [c.id, c.nombre])), [db.categories])
+  const nombreSubfamilia = useMemo(() => new Map(db.subfamilias.map((s) => [s.id, s.nombre])), [db.subfamilias])
+  const proveedorById = useMemo(() => new Map(db.suppliers.map((s) => [s.id, s])), [db.suppliers])
+  const locationById = useMemo(() => new Map(db.locations.map((l) => [l.id, l])), [db.locations])
+
+  const ventaLineas = useMemo(
+    () =>
+      db.sales.flatMap((s) =>
+        s.lineas.map((l) => ({
+          fecha: s.fecha,
+          comercialId: s.comercialId,
+          clienteId: s.clienteId,
+          canal: s.canal,
+          categoriaId: familiaIdParaProducto(l.productoId),
+          subfamiliaId: productById.get(l.productoId)?.subfamiliaId ?? '',
+          cantidad: l.cantidad,
+          importe: l.cantidad * l.precioUnit * (1 + l.igic / 100),
+        })),
+      ),
+    [db.sales, productById, subfamiliaById],
+  )
+
+  const compraLineas = useMemo(
+    () =>
+      db.purchases.flatMap((p) =>
+        p.lineas.map((l) => ({
+          fecha: p.fecha,
+          proveedorId: p.proveedorId,
+          locationId: p.locationId,
+          estado: p.estado,
+          categoriaId: familiaIdParaProducto(l.productoId),
+          subfamiliaId: productById.get(l.productoId)?.subfamiliaId ?? '',
+          cantidad: l.cantidad,
+          importe: l.cantidad * l.precioUnit * (1 + l.igic / 100),
+        })),
+      ),
+    [db.purchases, productById, subfamiliaById],
+  )
+
+  type VentaLinea = (typeof ventaLineas)[number]
+  type CompraLinea = (typeof compraLineas)[number]
+
+  const dimensionesVentas: DimensionOption<VentaLinea>[] = [
+    { value: 'comercial', label: 'Comercial', resolve: (l) => repById.get(l.comercialId)?.nombre ?? '—' },
+    { value: 'cliente', label: 'Cliente', resolve: (l) => clienteById.get(l.clienteId)?.nombre ?? 'Cliente eliminado' },
+    { value: 'categoria', label: 'Familia', resolve: (l) => categoriaById.get(l.categoriaId) ?? '—' },
+    { value: 'subfamilia', label: 'Subfamilia', resolve: (l) => nombreSubfamilia.get(l.subfamiliaId) ?? '—' },
+    { value: 'canal', label: 'Canal', resolve: (l) => l.canal },
+    { value: 'fecha', label: 'Mes', resolve: (l) => l.fecha.slice(0, 7) },
+  ]
+
+  const dimensionesCompras: DimensionOption<CompraLinea>[] = [
+    { value: 'proveedor', label: 'Proveedor', resolve: (l) => proveedorById.get(l.proveedorId)?.nombre ?? '—' },
+    { value: 'categoria', label: 'Familia', resolve: (l) => categoriaById.get(l.categoriaId) ?? '—' },
+    { value: 'subfamilia', label: 'Subfamilia', resolve: (l) => nombreSubfamilia.get(l.subfamiliaId) ?? '—' },
+    { value: 'almacen', label: 'Almacén destino', resolve: (l) => locationById.get(l.locationId)?.nombre ?? '—' },
+    { value: 'estado', label: 'Estado', resolve: (l) => l.estado },
+    { value: 'fecha', label: 'Mes', resolve: (l) => l.fecha.slice(0, 7) },
+  ]
+
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+            <BarChart3 size={20} className="text-slate-700" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900">Informes avanzados</h1>
+        </div>
+        <Badge label="Activo (Fase 2)" />
+      </div>
+      <p className="text-sm text-slate-500 mb-6 ml-[52px]">Rentabilidad, ranking de ventas y rotación de stock, calculados sobre los datos actuales</p>
+
+      <div className="text-sm font-semibold text-slate-900 mb-3">Generador de informes</div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <ReportBuilder
+          title="Ventas"
+          data={ventaLineas}
+          dimensions={dimensionesVentas}
+          getFecha={(l) => l.fecha}
+          getUnidades={(l) => l.cantidad}
+          getImporte={(l) => l.importe}
+          csvPrefix="ventas"
+          rowUnitLabel="Líneas"
+        />
+        <ReportBuilder
+          title="Compras"
+          data={compraLineas}
+          dimensions={dimensionesCompras}
+          getFecha={(l) => l.fecha}
+          getUnidades={(l) => l.cantidad}
+          getImporte={(l) => l.importe}
+          csvPrefix="compras"
+          rowUnitLabel="Líneas"
+        />
+      </div>
+
+      <div className="text-sm font-semibold text-slate-900 mb-3">Resumen rápido</div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-sm font-medium text-slate-700 mb-1">Productos más vendidos (importe)</div>
+          {rankingProductos.map((p) => (
+            <BarRow key={p.nombre} label={p.nombre} value={p.importe} max={maxProducto} formatted={`${formatEUR(p.importe)} · margen ${formatEUR(p.margen)}`} />
+          ))}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-sm font-medium text-slate-700 mb-1">Clientes por facturación</div>
+          {rankingClientes.map((c) => (
+            <BarRow key={c.nombre} label={c.nombre} value={c.total} max={maxCliente} formatted={formatEUR(c.total)} />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-sm font-medium text-slate-700 mb-1">Ranking de comerciales</div>
+          {rankingComerciales.map((c) => (
+            <BarRow key={c.nombre} label={`${c.nombre} · ${c.pedidos} pedidos`} value={c.total} max={maxComercial} formatted={formatEUR(c.total)} />
+          ))}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-sm font-medium text-slate-700 mb-1">Rotación de stock por categoría (últimos 30 días)</div>
+          {rotacionPorCategoria.map((c) => (
+            <BarRow key={c.nombre} label={c.nombre} value={c.rotacion} max={maxRotacion} formatted={`${c.vendido} vendidas / ${c.stock} stock`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
