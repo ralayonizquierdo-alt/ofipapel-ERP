@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore } from 'firebase/firestore'
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -12,7 +12,9 @@ const firebaseConfig = {
 }
 
 export const firebaseApp = initializeApp(firebaseConfig)
-export const firestore = getFirestore(firebaseApp)
+// Varios campos opcionales del modelo (imagenUrl, fotoUrl, km...) llegan como `undefined` cuando no
+// aplican — Firestore los rechaza por defecto; con esto los trata igual que lo hacía JSON/localStorage.
+export const firestore = initializeFirestore(firebaseApp, { ignoreUndefinedProperties: true })
 export const auth = getAuth(firebaseApp)
 
 /** El acceso real a la app lo controla la pantalla de contraseña compartida; esta sesión anónima

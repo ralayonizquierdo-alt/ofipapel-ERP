@@ -43,7 +43,7 @@ export default function Dashboard() {
   return (
     <div>
       <h1 className="text-xl font-semibold text-slate-900 mb-1">Panel principal</h1>
-      <p className="text-sm text-slate-500 mb-6">Visión general del negocio — datos de ejemplo generados localmente</p>
+      <p className="text-sm text-slate-500 mb-6">Visión general del negocio — datos compartidos en tiempo real con el equipo</p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard icon={Package} label="Referencias activas" value={stats.referenciasActivas.toLocaleString('es-ES')} />
