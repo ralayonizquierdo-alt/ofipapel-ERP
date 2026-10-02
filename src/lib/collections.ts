@@ -1,6 +1,6 @@
 import type { Database } from '../types'
 
-/** Los 18 nombres de colección de Database — también son los nombres de colección en Firestore. */
+/** Los nombres de colección de Database — también son los nombres de colección en Firestore. */
 export const COLLECTION_KEYS = [
   'locations',
   'salesReps',
@@ -20,6 +20,14 @@ export const COLLECTION_KEYS = [
   'verifactuEnvios',
   'gastosVehiculos',
   'citasVehiculos',
+  'empresas',
+  'oportunidades',
+  'contactosCRM',
+  'objetivosComerciales',
+  'dispositivosHardware',
+  'dispositivosApp',
+  'reglasAutomatizacion',
+  'ejecucionesRegla',
 ] as const satisfies readonly (keyof Database)[]
 
 export type CollectionKey = (typeof COLLECTION_KEYS)[number]

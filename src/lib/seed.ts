@@ -30,6 +30,17 @@ import type {
   TipoGastoVehiculo,
   CitaVehiculo,
   TarifaId,
+  Empresa,
+  Oportunidad,
+  FaseOportunidad,
+  ContactoCRM,
+  TipoContactoCRM,
+  ObjetivoComercial,
+  DispositivoHardware,
+  TipoDispositivoHardware,
+  DispositivoApp,
+  ReglaAutomatizacion,
+  EjecucionRegla,
 } from '../types'
 
 const ZONES = [
@@ -713,6 +724,158 @@ function buildTransfers(rng: () => number, products: Product[], locations: Locat
   return transfers.sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
 }
 
+function buildEmpresas(): Empresa[] {
+  return [
+    { id: 'emp-1', nombre: 'Ofipapel Canarias S.L.', cif: 'B38123456', pais: 'España', moneda: 'EUR', tipoCambioAEur: 1, esMatriz: true, activa: true, ingresos: 1850000, gastos: 1420000 },
+    { id: 'emp-2', nombre: 'Ofipapel Maroc SARL', cif: 'MA-774125', pais: 'Marruecos', moneda: 'MAD', tipoCambioAEur: 0.092, esMatriz: false, activa: true, ingresos: 4200000, gastos: 3650000 },
+    { id: 'emp-3', nombre: 'Ofipapel UK Ltd.', cif: 'GB-09812345', pais: 'Reino Unido', moneda: 'GBP', tipoCambioAEur: 1.17, esMatriz: false, activa: true, ingresos: 310000, gastos: 265000 },
+    { id: 'emp-4', nombre: 'Ofipapel International Inc.', cif: 'US-EIN-884521', pais: 'Estados Unidos', moneda: 'USD', tipoCambioAEur: 0.92, esMatriz: false, activa: false, ingresos: 95000, gastos: 88000 },
+  ]
+}
+
+const FASES_OPORTUNIDAD: FaseOportunidad[] = ['Prospección', 'Cualificación', 'Propuesta', 'Negociación', 'Ganada', 'Perdida']
+
+function buildOportunidades(rng: () => number, clients: Client[]): Oportunidad[] {
+  const mayoristas = clients.filter((c) => c.tipo === 'Mayorista')
+  const oportunidades: Oportunidad[] = []
+  for (let i = 1; i <= 36; i++) {
+    const cliente = pick(rng, mayoristas)
+    const fase = pick(rng, FASES_OPORTUNIDAD)
+    const probabilidad = fase === 'Ganada' ? 100 : fase === 'Perdida' ? 0 : intBetween(rng, 15, 80)
+    oportunidades.push({
+      id: `op-${i}`,
+      nombre: `Suministro anual · ${cliente.nombre}`,
+      clienteId: cliente.id,
+      comercialId: cliente.comercialId,
+      fase,
+      importeEstimado: Number((intBetween(rng, 150000, 2500000) / 100).toFixed(2)),
+      probabilidad,
+      fechaCierreEstimada: fase === 'Ganada' || fase === 'Perdida' ? daysAgo(rng, 45) : daysAhead(rng, intBetween(rng, 5, 90)),
+    })
+  }
+  return oportunidades
+}
+
+const TIPOS_CONTACTO: TipoContactoCRM[] = ['Llamada', 'Visita', 'Email', 'Reunión']
+const NOTAS_CONTACTO = [
+  'Revisión de condiciones de pago, todo correcto.',
+  'Interesado en ampliar el pedido mensual de tóner.',
+  'Reclamación por retraso en la última entrega, resuelta.',
+  'Presentación del nuevo catálogo de material escolar.',
+  'Seguimiento de factura pendiente de pago.',
+  'Petición de presupuesto para material de oficina nuevo centro.',
+]
+
+function buildContactosCRM(rng: () => number, clients: Client[]): ContactoCRM[] {
+  const mayoristas = clients.filter((c) => c.tipo === 'Mayorista')
+  const contactos: ContactoCRM[] = []
+  let id = 1
+  mayoristas.forEach((cliente) => {
+    const numContactos = intBetween(rng, 0, 4)
+    for (let i = 0; i < numContactos; i++) {
+      contactos.push({
+        id: `ctc-${id++}`,
+        clienteId: cliente.id,
+        comercialId: cliente.comercialId,
+        fecha: daysAgo(rng, 120),
+        tipo: pick(rng, TIPOS_CONTACTO),
+        notas: pick(rng, NOTAS_CONTACTO),
+      })
+    }
+  })
+  return contactos.sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+}
+
+function buildObjetivosComerciales(rng: () => number, reps: SalesRep[]): ObjetivoComercial[] {
+  const objetivos: ObjetivoComercial[] = []
+  const now = new Date()
+  let id = 1
+  for (let mesOffset = 2; mesOffset >= 0; mesOffset--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - mesOffset, 1)
+    const periodo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    reps.forEach((rep) => {
+      objetivos.push({
+        id: `obj-${id++}`,
+        comercialId: rep.id,
+        periodo,
+        objetivoImporte: Number((intBetween(rng, 800000, 2200000) / 100).toFixed(2)),
+      })
+    })
+  }
+  return objetivos
+}
+
+const HARDWARE_DEFS: { tipo: TipoDispositivoHardware; modelos: string[] }[] = [
+  { tipo: 'Lector de código de barras', modelos: ['Honeywell Voyager 1250g', 'Zebra DS2208', 'Datalogic QuickScan'] },
+  { tipo: 'Impresora de etiquetas', modelos: ['Zebra ZD220', 'Brother QL-820NWB'] },
+  { tipo: 'Báscula', modelos: ['Mettler Toledo BC-60', 'CAS SW-10'] },
+  { tipo: 'Impresora de tickets', modelos: ['Epson TM-T20III', 'Star Micronics TSP143'] },
+]
+
+function buildDispositivosHardware(rng: () => number, locations: Location[]): DispositivoHardware[] {
+  const dispositivos: DispositivoHardware[] = []
+  let id = 1
+  locations.forEach((loc) => {
+    HARDWARE_DEFS.forEach((def) => {
+      if (rng() < 0.6) {
+        dispositivos.push({
+          id: `hw-${id++}`,
+          tipo: def.tipo,
+          modelo: pick(rng, def.modelos),
+          locationId: loc.id,
+          estado: pick(rng, ['Conectado', 'Conectado', 'Conectado', 'Desconectado', 'Error']),
+          ultimaConexion: daysAgo(rng, 5),
+        })
+      }
+    })
+  })
+  return dispositivos
+}
+
+function buildDispositivosApp(rng: () => number, users: AppUser[]): DispositivoApp[] {
+  const elegibles = users.filter((u) => u.rol === 'Comercial' || u.rol === 'Almacén')
+  return elegibles.map((user, i) => {
+    const esComercial = user.rol === 'Comercial'
+    return {
+      id: `app-${i + 1}`,
+      usuarioId: user.id,
+      plataforma: pick(rng, ['Android', 'Android', 'iOS']),
+      version: pick(rng, ['2.4.0', '2.4.1', '2.3.2']),
+      ultimaSincronizacion: daysAgo(rng, 3),
+      estado: pick(rng, ['Conectado', 'Conectado', 'Desconectado']),
+      consultaStock: esComercial,
+      pedidosInSitu: esComercial,
+      preparacionAlmacen: !esComercial,
+    }
+  })
+}
+
+function buildReglasAutomatizacion(): ReglaAutomatizacion[] {
+  return [
+    { id: 'reg-1', nombre: 'Reposición automática bajo mínimo', tipo: 'Reposición automática', condicion: 'Stock de una referencia por debajo de su mínimo en Ofipapel (almacén central)', accion: 'Generar pedido de compra al proveedor habitual por la diferencia hasta el doble del mínimo', activa: true },
+    { id: 'reg-2', nombre: 'Alerta de rotura inminente', tipo: 'Alerta predictiva', condicion: 'Ritmo de venta de los últimos 30 días agota el stock disponible en menos de 7 días', accion: 'Notificar al encargado del almacén y al comercial de la zona', activa: true },
+    { id: 'reg-3', nombre: 'Bloqueo de pedidos a clientes con saldo vencido', tipo: 'Regla de negocio', condicion: 'Cliente mayorista con saldo pendiente superior a 3.000€ y más de 60 días', accion: 'Requerir aprobación de administración antes de servir un nuevo pedido', activa: true },
+    { id: 'reg-4', nombre: 'Reposición automática de tienda', tipo: 'Reposición automática', condicion: 'Stock de tienda por debajo del mínimo y stock disponible en almacén central', accion: 'Generar transferencia automática desde el almacén central', activa: false },
+  ]
+}
+
+function buildEjecucionesRegla(rng: () => number, reglas: ReglaAutomatizacion[]): EjecucionRegla[] {
+  const ejecuciones: EjecucionRegla[] = []
+  let id = 1
+  reglas.filter((r) => r.activa).forEach((regla) => {
+    const num = intBetween(rng, 2, 6)
+    for (let i = 0; i < num; i++) {
+      ejecuciones.push({
+        id: `exr-${id++}`,
+        reglaId: regla.id,
+        fecha: daysAgo(rng, 30),
+        resultado: regla.tipo === 'Reposición automática' ? `Pedido generado por ${intBetween(rng, 50, 800)} unidades` : regla.tipo === 'Alerta predictiva' ? 'Alerta enviada al equipo de almacén' : 'Pedido retenido pendiente de aprobación',
+      })
+    }
+  })
+  return ejecuciones.sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+}
+
 export function generateDatabase(): Database {
   const rng = createRng(20260702)
   const locations = buildLocations()
@@ -732,6 +895,14 @@ export function generateDatabase(): Database {
   const verifactuEnvios = buildVerifactuEnvios(invoices)
   const gastosVehiculos = buildGastosVehiculos(rng, vehicles)
   const citasVehiculos = buildCitasVehiculos(rng, vehicles)
+  const empresas = buildEmpresas()
+  const oportunidades = buildOportunidades(rng, clients)
+  const contactosCRM = buildContactosCRM(rng, clients)
+  const objetivosComerciales = buildObjetivosComerciales(rng, reps)
+  const dispositivosHardware = buildDispositivosHardware(rng, locations)
+  const dispositivosApp = buildDispositivosApp(rng, users)
+  const reglasAutomatizacion = buildReglasAutomatizacion()
+  const ejecucionesRegla = buildEjecucionesRegla(rng, reglasAutomatizacion)
 
   return {
     locations,
@@ -752,5 +923,13 @@ export function generateDatabase(): Database {
     verifactuEnvios,
     gastosVehiculos,
     citasVehiculos,
+    empresas,
+    oportunidades,
+    contactosCRM,
+    objetivosComerciales,
+    dispositivosHardware,
+    dispositivosApp,
+    reglasAutomatizacion,
+    ejecucionesRegla,
   }
 }

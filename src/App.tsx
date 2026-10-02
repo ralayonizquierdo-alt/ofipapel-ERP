@@ -18,6 +18,11 @@ import FamiliasPage from './pages/FamiliasPage'
 import InformesPage from './pages/InformesPage'
 import TransferenciasPage from './pages/TransferenciasPage'
 import FlotaPage from './pages/FlotaPage'
+import MultiempresaPage from './pages/MultiempresaPage'
+import CrmPage from './pages/CrmPage'
+import HardwarePage from './pages/HardwarePage'
+import AppMovilPage from './pages/AppMovilPage'
+import AutomatizacionPage from './pages/AutomatizacionPage'
 import ModulePage from './components/ModulePage'
 import { ALL_ITEMS } from './data/menu'
 
@@ -40,6 +45,11 @@ const BUILT_PAGES: Record<string, ComponentType> = {
   informes: InformesPage,
   multialmacen: TransferenciasPage,
   flota: FlotaPage,
+  multiempresa: MultiempresaPage,
+  crm: CrmPage,
+  hardware: HardwarePage,
+  appmovil: AppMovilPage,
+  automatizacion: AutomatizacionPage,
 }
 
 function App() {

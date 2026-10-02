@@ -3,7 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import type { Database } from '../types'
 import { firestore, ensureSignedIn } from './firebase'
 import { COLLECTION_KEYS, type CollectionKey } from './collections'
-import { seedIfEmpty, diffAndWrite, wipeAndReplace } from './firestoreSync'
+import { seedIfEmpty, seedMissingCollections, diffAndWrite, wipeAndReplace } from './firestoreSync'
 
 type CollectionsState = { [K in CollectionKey]?: Database[K] }
 
@@ -38,6 +38,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
 
     ensureSignedIn()
       .then(() => seedIfEmpty())
+      .then(() => seedMissingCollections())
       .catch((err) => console.error('Error preparando Firestore:', err))
       .finally(() => {
         if (cancelled) return

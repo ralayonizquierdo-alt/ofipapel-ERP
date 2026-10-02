@@ -266,6 +266,98 @@ export interface StockTransfer {
   lineas: TransferLine[]
 }
 
+export type Moneda = 'EUR' | 'USD' | 'GBP' | 'MAD'
+
+/** Sociedad del grupo (Fase 3 · Multi-empresa / divisa). Ofipapel Canarias S.L. es la sociedad
+ * matriz y es la que ya opera con todo el resto de módulos (ventas, compras, stock...). */
+export interface Empresa {
+  id: string
+  nombre: string
+  cif: string
+  pais: string
+  moneda: Moneda
+  tipoCambioAEur: number
+  esMatriz: boolean
+  activa: boolean
+  ingresos: number
+  gastos: number
+}
+
+export type FaseOportunidad = 'Prospección' | 'Cualificación' | 'Propuesta' | 'Negociación' | 'Ganada' | 'Perdida'
+
+export interface Oportunidad {
+  id: string
+  nombre: string
+  clienteId: string
+  comercialId: string
+  fase: FaseOportunidad
+  importeEstimado: number
+  probabilidad: number
+  fechaCierreEstimada: string
+}
+
+export type TipoContactoCRM = 'Llamada' | 'Visita' | 'Email' | 'Reunión'
+
+export interface ContactoCRM {
+  id: string
+  clienteId: string
+  comercialId: string
+  fecha: string
+  tipo: TipoContactoCRM
+  notas: string
+}
+
+export interface ObjetivoComercial {
+  id: string
+  comercialId: string
+  periodo: string
+  objetivoImporte: number
+}
+
+export type TipoDispositivoHardware = 'Lector de código de barras' | 'Impresora de etiquetas' | 'Báscula' | 'Impresora de tickets'
+export type EstadoDispositivo = 'Conectado' | 'Desconectado' | 'Error'
+
+export interface DispositivoHardware {
+  id: string
+  tipo: TipoDispositivoHardware
+  modelo: string
+  locationId: string
+  estado: EstadoDispositivo
+  ultimaConexion: string
+}
+
+export type PlataformaApp = 'Android' | 'iOS'
+
+export interface DispositivoApp {
+  id: string
+  usuarioId: string
+  plataforma: PlataformaApp
+  version: string
+  ultimaSincronizacion: string
+  estado: EstadoDispositivo
+  consultaStock: boolean
+  pedidosInSitu: boolean
+  preparacionAlmacen: boolean
+}
+
+export type TipoReglaAutomatizacion = 'Reposición automática' | 'Alerta predictiva' | 'Regla de negocio'
+
+export interface ReglaAutomatizacion {
+  id: string
+  nombre: string
+  tipo: TipoReglaAutomatizacion
+  condicion: string
+  accion: string
+  activa: boolean
+}
+
+export interface EjecucionRegla {
+  id: string
+  reglaId: string
+  fecha: string
+  resultado: string
+}
+
 export interface Database {
   locations: Location[]
   salesReps: SalesRep[]
@@ -285,4 +377,12 @@ export interface Database {
   verifactuEnvios: VerifactuEnvio[]
   gastosVehiculos: GastoVehiculo[]
   citasVehiculos: CitaVehiculo[]
+  empresas: Empresa[]
+  oportunidades: Oportunidad[]
+  contactosCRM: ContactoCRM[]
+  objetivosComerciales: ObjetivoComercial[]
+  dispositivosHardware: DispositivoHardware[]
+  dispositivosApp: DispositivoApp[]
+  reglasAutomatizacion: ReglaAutomatizacion[]
+  ejecucionesRegla: EjecucionRegla[]
 }

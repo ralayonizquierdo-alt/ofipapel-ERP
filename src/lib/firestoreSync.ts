@@ -59,6 +59,19 @@ export async function seedIfEmpty(): Promise<void> {
   await batch.commit()
 }
 
+/**
+ * Siembra solo las colecciones que estén vacías (p. ej. las añadidas en una fase posterior a la
+ * primera siembra, que `seedIfEmpty` ya no vuelve a tocar porque `meta/seed` quedó en "done").
+ * No borra ni reescribe ninguna colección que ya tenga documentos.
+ */
+export async function seedMissingCollections(): Promise<void> {
+  const fresh = generateDatabase()
+  for (const key of COLLECTION_KEYS) {
+    const existing = await getDocs(collection(firestore, key))
+    if (existing.empty) await writeItemsInBatches(key, fresh[key] as unknown as AnyItem[])
+  }
+}
+
 /** Compara dos listas por id y aplica solo los altas/bajas/cambios reales a Firestore. */
 async function reconcileCollection(collectionName: string, prevItems: AnyItem[], nextItems: AnyItem[]): Promise<void> {
   const prevById = new Map(prevItems.map((it) => [it.id, it]))
